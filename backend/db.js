@@ -25,6 +25,7 @@ db.serialize(() => {
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     template_id INTEGER,
     text TEXT,
+    image_url TEXT,
     FOREIGN KEY(template_id) REFERENCES templates(id)
   )`);
 

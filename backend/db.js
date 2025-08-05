@@ -42,10 +42,22 @@ db.serialize(() => {
     player_id INTEGER,
     question_id INTEGER,
     option_id INTEGER,
+    is_correct INTEGER,
     FOREIGN KEY(player_id) REFERENCES players(id),
     FOREIGN KEY(question_id) REFERENCES questions(id),
     FOREIGN KEY(option_id) REFERENCES options(id)
   )`);
+
+  // Ensure the is_correct column exists for legacy databases
+  db.all('PRAGMA table_info(responses)', (err, columns) => {
+    if (err) {
+      return;
+    }
+    const hasIsCorrect = columns.some(col => col.name === 'is_correct');
+    if (!hasIsCorrect) {
+      db.run('ALTER TABLE responses ADD COLUMN is_correct INTEGER');
+    }
+  });
 
   const password = bcrypt.hashSync('admin', 10);
   db.run('INSERT OR IGNORE INTO admin (username, password) VALUES (?, ?)', ['admin', password]);

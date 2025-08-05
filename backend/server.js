@@ -157,8 +157,61 @@ app.post('/api/templates', isAdmin, (req, res) => {
         );
       }
 
-      insertNextQuestion();
+  insertNextQuestion();
     });
+  });
+});
+
+app.post('/api/responses', (req, res) => {
+  const { player_id, question_id, is_correct } = req.body;
+  if (!player_id || !question_id || typeof is_correct !== 'boolean') {
+    return res.status(400).json({ error: 'Invalid response data' });
+  }
+
+  db.run(
+    'INSERT INTO responses (player_id, question_id, is_correct) VALUES (?, ?, ?)',
+    [player_id, question_id, is_correct ? 1 : 0],
+    function (err) {
+      if (err) {
+        return res.status(500).json({ error: 'Database error' });
+      }
+      res
+        .status(201)
+        .json({ id: this.lastID, player_id, question_id, is_correct });
+    }
+  );
+});
+
+app.get('/api/report/top-players', isAdmin, (req, res) => {
+  const sql = `
+    SELECT p.id, p.username AS name, COALESCE(SUM(r.is_correct), 0) AS correct_answers
+    FROM players p
+    LEFT JOIN responses r ON p.id = r.player_id
+    GROUP BY p.id
+    ORDER BY correct_answers DESC
+  `;
+  db.all(sql, [], (err, rows) => {
+    if (err) {
+      return res.status(500).json({ error: 'Database error' });
+    }
+    res.json(rows);
+  });
+});
+
+app.get('/api/report/questions', isAdmin, (req, res) => {
+  const sql = `
+    SELECT q.id, q.text, COUNT(r.id) AS total_responses,
+           COALESCE(SUM(r.is_correct), 0) AS correct_responses
+    FROM questions q
+    LEFT JOIN responses r ON q.id = r.question_id
+    GROUP BY q.id
+    ORDER BY q.id
+  `;
+  db.all(sql, [], (err, rows) => {
+    if (err) {
+      return res.status(500).json({ error: 'Database error' });
+    }
+    res.json(rows);
   });
 });
 

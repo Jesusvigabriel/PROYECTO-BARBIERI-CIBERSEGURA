@@ -2,6 +2,7 @@ const express = require('express');
 const session = require('express-session');
 const cors = require('cors');
 const bcrypt = require('bcrypt');
+const path = require('path');
 const db = require('./db');
 
 const app = express();
@@ -219,8 +220,11 @@ app.get('/api/admin', isAdmin, (req, res) => {
   res.json({ message: 'Admin access granted' });
 });
 
-app.get('/', (req, res) => {
-  res.send('Server running');
+const distPath = path.join(__dirname, '../frontend/dist');
+app.use(express.static(distPath));
+
+app.get('*', (req, res) => {
+  res.sendFile(path.join(distPath, 'index.html'));
 });
 
 app.listen(PORT, () => {

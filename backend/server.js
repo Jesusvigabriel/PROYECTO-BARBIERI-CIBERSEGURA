@@ -87,6 +87,81 @@ app.delete('/api/players', isAdmin, (req, res) => {
   });
 });
 
+app.post('/api/templates', isAdmin, (req, res) => {
+  const { name, questions } = req.body;
+  if (!name || !Array.isArray(questions) || questions.length === 0) {
+    return res.status(400).json({ error: 'Invalid template data' });
+  }
+
+  db.serialize(() => {
+    db.run('BEGIN TRANSACTION');
+    db.run('INSERT INTO templates (name) VALUES (?)', [name], function (err) {
+      if (err) {
+        db.run('ROLLBACK');
+        return res.status(500).json({ error: 'Database error' });
+      }
+      const templateId = this.lastID;
+      let qIndex = 0;
+
+      function insertNextQuestion() {
+        if (qIndex >= questions.length) {
+          db.run('COMMIT');
+          return res.status(201).json({ id: templateId, name });
+        }
+
+        const q = questions[qIndex];
+        if (!q.text || !q.image_url || !Array.isArray(q.options)) {
+          db.run('ROLLBACK');
+          return res.status(400).json({ error: 'Invalid question data' });
+        }
+
+        db.run(
+          'INSERT INTO questions (template_id, text, image_url) VALUES (?, ?, ?)',
+          [templateId, q.text, q.image_url],
+          function (err) {
+            if (err) {
+              db.run('ROLLBACK');
+              return res.status(500).json({ error: 'Database error' });
+            }
+            const questionId = this.lastID;
+            let oIndex = 0;
+
+            function insertNextOption() {
+              if (oIndex >= q.options.length) {
+                qIndex++;
+                return insertNextQuestion();
+              }
+
+              const opt = q.options[oIndex];
+              if (!opt.text || typeof opt.is_correct !== 'boolean') {
+                db.run('ROLLBACK');
+                return res.status(400).json({ error: 'Invalid option data' });
+              }
+
+              db.run(
+                'INSERT INTO options (question_id, text, is_correct) VALUES (?, ?, ?)',
+                [questionId, opt.text, opt.is_correct ? 1 : 0],
+                err => {
+                  if (err) {
+                    db.run('ROLLBACK');
+                    return res.status(500).json({ error: 'Database error' });
+                  }
+                  oIndex++;
+                  insertNextOption();
+                }
+              );
+            }
+
+            insertNextOption();
+          }
+        );
+      }
+
+      insertNextQuestion();
+    });
+  });
+});
+
 app.get('/api/admin', isAdmin, (req, res) => {
   res.json({ message: 'Admin access granted' });
 });

@@ -53,6 +53,40 @@ app.post('/api/login', (req, res) => {
   });
 });
 
+app.post('/api/player', (req, res) => {
+  const { name } = req.body;
+  if (!name) {
+    return res.status(400).json({ error: 'Missing name' });
+  }
+  db.run('INSERT INTO players (username) VALUES (?)', [name], function (err) {
+    if (err) {
+      if (err.code === 'SQLITE_CONSTRAINT') {
+        return res.status(409).json({ error: 'Player already exists' });
+      }
+      return res.status(500).json({ error: 'Database error' });
+    }
+    res.status(201).json({ id: this.lastID, name });
+  });
+});
+
+app.get('/api/players', isAdmin, (req, res) => {
+  db.all('SELECT id, username AS name FROM players', [], (err, rows) => {
+    if (err) {
+      return res.status(500).json({ error: 'Database error' });
+    }
+    res.json(rows);
+  });
+});
+
+app.delete('/api/players', isAdmin, (req, res) => {
+  db.run('DELETE FROM players', err => {
+    if (err) {
+      return res.status(500).json({ error: 'Database error' });
+    }
+    res.json({ message: 'Players deleted' });
+  });
+});
+
 app.get('/api/admin', isAdmin, (req, res) => {
   res.json({ message: 'Admin access granted' });
 });
